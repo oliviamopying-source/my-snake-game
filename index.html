@@ -1,28 +1,35 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
-    <title>Snake Game</title>
+    <meta charset="UTF-8">
+    <title>Snake Game on GitHub</title>
     <style>
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #2c3e50; color: white; font-family: Arial, sans-serif; flex-direction: column; }
-        canvas { border: 5px solid #ecf0f1; box-shadow: 0 0 20px rgba(0,0,0,0.5); background: #000; }
+        body { display: flex; flex-direction: column; align-items: center; background-color: #2c3e50; color: white; font-family: sans-serif; }
+        canvas { border: 5px solid #ecf0f1; box-shadow: 0 0 20px rgba(0,0,0,0.5); background-color: #000; }
         h1 { margin-bottom: 10px; }
+        .score { font-size: 24px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <h1>Snake Game 🐍</h1>
+
+    <h1>Snake Game</h1>
+    <div class="score">คะแนน: <span id="scoreVal">0</span></div>
     <canvas id="snakeGame" width="400" height="400"></canvas>
-    <p>ใช้ปุ่มลูกศรในการบังคับ</p>
 
     <script>
         const canvas = document.getElementById("snakeGame");
         const ctx = canvas.getContext("2d");
-        const box = 20;
-        let snake = [{x: 10 * box, y: 10 * box}];
-        let food = { x: Math.floor(Math.random() * 19 + 1) * box, y: Math.floor(Math.random() * 19 + 1) * box };
-        let score = 0;
-        let d;
+        const scoreElement = document.getElementById("scoreVal");
 
+        const box = 20; // ขนาดของแต่ละช่อง
+        let score = 0;
+        let snake = [{ x: 9 * box, y: 10 * box }]; // ตัวงู
+        let food = { x: Math.floor(Math.random() * 19 + 1) * box, y: Math.floor(Math.random() * 19 + 1) * box };
+        let d; // ทิศทาง
+
+        // ดักจับการกดปุ่มที่คีย์บอร์ด
         document.addEventListener("keydown", direction);
+
         function direction(event) {
             if(event.keyCode == 37 && d != "RIGHT") d = "LEFT";
             else if(event.keyCode == 38 && d != "DOWN") d = "UP";
@@ -31,43 +38,51 @@
         }
 
         function draw() {
+            // พื้นหลัง
             ctx.fillStyle = "black";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // วาดตัวงู
             for(let i = 0; i < snake.length; i++) {
-                ctx.fillStyle = (i == 0) ? "#2ecc71" : "#27ae60";
+                ctx.fillStyle = (i == 0) ? "#2ecc71" : "#27ae60"; // หัวสีอ่อน ตัวสีเข้ม
                 ctx.fillRect(snake[i].x, snake[i].y, box, box);
                 ctx.strokeStyle = "black";
                 ctx.strokeRect(snake[i].x, snake[i].y, box, box);
             }
 
+            // วาดอาหาร
             ctx.fillStyle = "#e74c3c";
             ctx.fillRect(food.x, food.y, box, box);
 
+            // ตำแหน่งหัวงูเดิม
             let snakeX = snake[0].x;
             let snakeY = snake[0].y;
 
+            // เลื่อนหัวงูตามทิศทาง
             if( d == "LEFT") snakeX -= box;
             if( d == "UP") snakeY -= box;
             if( d == "RIGHT") snakeX += box;
             if( d == "DOWN") snakeY += box;
 
+            // ตรวจสอบว่ากินอาหารหรือไม่
             if(snakeX == food.x && snakeY == food.y) {
                 score++;
+                scoreElement.innerHTML = score;
                 food = { x: Math.floor(Math.random() * 19 + 1) * box, y: Math.floor(Math.random() * 19 + 1) * box };
             } else {
-                snake.pop();
+                snake.pop(); // เอาหางออกถ้าไม่ได้กิน
             }
 
             let newHead = { x: snakeX, y: snakeY };
 
+            // กฎการแพ้ (ชนกำแพง หรือ ชนตัวเอง)
             if(snakeX < 0 || snakeY < 0 || snakeX >= canvas.width || snakeY >= canvas.height || collision(newHead, snake)) {
                 clearInterval(game);
-                alert("Game Over! Score: " + score);
-                location.reload();
+                alert("Game Over! คะแนนของคุณคือ: " + score);
+                location.reload(); // รีโหลดหน้าใหม่เพื่อเริ่มเกม
             }
 
-            snake.unshift(newHead);
+            snake.unshift(newHead); // เพิ่มหัวใหม่เข้าไป
         }
 
         function collision(head, array) {
@@ -77,7 +92,7 @@
             return false;
         }
 
-        let game = setInterval(draw, 100);
+        let game = setInterval(draw, 100); // ตั้งค่าความเร็ว (ยิ่งน้อยยิ่งเร็ว)
     </script>
 </body>
 </html>
