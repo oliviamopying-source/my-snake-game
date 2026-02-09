@@ -2,97 +2,202 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Snake Game on GitHub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Space Shooter All-in-One</title>
     <style>
-        body { display: flex; flex-direction: column; align-items: center; background-color: #2c3e50; color: white; font-family: sans-serif; }
-        canvas { border: 5px solid #ecf0f1; box-shadow: 0 0 20px rgba(0,0,0,0.5); background-color: #000; }
-        h1 { margin-bottom: 10px; }
-        .score { font-size: 24px; margin-bottom: 10px; }
+        /* --- CSS: ส่วนตกแต่งหน้าตา --- */
+        body { 
+            margin: 0; 
+            background: #1a1a2e; 
+            color: white; 
+            text-align: center; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            overflow: hidden; 
+            touch-action: manipulation; 
+        }
+        canvas { 
+            background: #000; 
+            display: block; 
+            margin: 10px auto; 
+            border: 3px solid #0f3460; 
+            border-radius: 8px;
+            max-width: 95vw; 
+            max-height: 55vh; 
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+        }
+        .ui { margin-top: 10px; }
+        .score-board { font-size: 24px; font-weight: bold; color: #e94560; }
+        
+        /* ปุ่มควบคุมสำหรับมือถือ */
+        .controls { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            gap: 15px; 
+            margin-top: 15px; 
+            padding: 0 10px;
+        }
+        .btn { 
+            width: 75px; 
+            height: 75px; 
+            background: rgba(255, 255, 255, 0.1); 
+            border: 2px solid #fff;
+            border-radius: 50%; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            font-size: 30px;
+            user-select: none; 
+            -webkit-user-select: none; 
+            cursor: pointer;
+        }
+        .btn:active { background: rgba(255, 255, 255, 0.3); transform: scale(0.9); }
+        .fire-btn { 
+            background: #e94560; 
+            width: 90px; 
+            height: 90px; 
+            border: none;
+            box-shadow: 0 0 15px #e94560;
+        }
     </style>
 </head>
 <body>
 
-    <h1>Snake Game</h1>
-    <div class="score">คะแนน: <span id="scoreVal">0</span></div>
-    <canvas id="snakeGame" width="400" height="400"></canvas>
+    <div class="ui">
+        <div class="score-board">SCORE: <span id="score">0</span></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="controls">
+        <div class="btn" id="leftBtn">◀️</div>
+        <div class="btn fire-btn" id="fireBtn">🔥</div>
+        <div class="btn" id="rightBtn">▶️</div>
+    </div>
+
+    <p style="font-size: 12px; color: #888;">PC: ใช้ลูกศร ซ้าย-ขวา และ Spacebar</p>
 
     <script>
-        const canvas = document.getElementById("snakeGame");
+        /* --- JavaScript: ส่วนควบคุมเกม --- */
+        const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
-        const scoreElement = document.getElementById("scoreVal");
+        const scoreElement = document.getElementById("score");
 
-        const box = 20; // ขนาดของแต่ละช่อง
+        canvas.width = 400;
+        canvas.height = 500;
+
         let score = 0;
-        let snake = [{ x: 9 * box, y: 10 * box }]; // ตัวงู
-        let food = { x: Math.floor(Math.random() * 19 + 1) * box, y: Math.floor(Math.random() * 19 + 1) * box };
-        let d; // ทิศทาง
+        let player = { x: 180, y: 440, w: 40, h: 25, speed: 8 };
+        let bullets = [];
+        let enemies = [];
+        let keys = {};
 
-        // ดักจับการกดปุ่มที่คีย์บอร์ด
-        document.addEventListener("keydown", direction);
+        // ระบบควบคุม (คอมพิวเตอร์)
+        document.addEventListener("keydown", (e) => keys[e.code] = true);
+        document.addEventListener("keyup", (e) => keys[e.code] = false);
 
-        function direction(event) {
-            if(event.keyCode == 37 && d != "RIGHT") d = "LEFT";
-            else if(event.keyCode == 38 && d != "DOWN") d = "UP";
-            else if(event.keyCode == 39 && d != "LEFT") d = "RIGHT";
-            else if(event.keyCode == 40 && d != "UP") d = "DOWN";
+        // ระบบควบคุม (มือถือ - Touch Events)
+        const setupBtn = (id, key) => {
+            const btn = document.getElementById(id);
+            btn.addEventListener("touchstart", (e) => { e.preventDefault(); keys[key] = true; });
+            btn.addEventListener("touchend", (e) => { e.preventDefault(); keys[key] = false; });
+            // เพิ่ม mousedown/up สำหรับคนเทสในคอมแต่กดปุ่มบนจอ
+            btn.addEventListener("mousedown", () => keys[key] = true);
+            btn.addEventListener("mouseup", () => keys[key] = false);
+        };
+
+        setupBtn("leftBtn", "ArrowLeft");
+        setupBtn("rightBtn", "ArrowRight");
+        setupBtn("fireBtn", "Space");
+
+        function spawnEnemy() {
+            let size = 30;
+            let x = Math.random() * (canvas.width - size);
+            enemies.push({ x: x, y: -size, w: size, h: size, speed: 2 + (score/100) }); 
+        }
+
+        function update() {
+            // ขยับยาน
+            if (keys["ArrowLeft"] && player.x > 0) player.x -= player.speed;
+            if (keys["ArrowRight"] && player.x < canvas.width - player.w) player.x += player.speed;
+            
+            // ยิง (หน่วงเวลานิดหน่อยไม่ให้กระสุนติดกันเกินไป)
+            if (keys["Space"]) {
+                if (bullets.length === 0 || bullets[bullets.length - 1].y < player.y - 30) {
+                    bullets.push({ x: player.x + player.w / 2 - 3, y: player.y, w: 6, h: 15 });
+                }
+            }
+
+            // จัดการกระสุน
+            bullets.forEach((b, i) => {
+                b.y -= 12;
+                if (b.y < 0) bullets.splice(i, 1);
+            });
+
+            // จัดการศัตรู
+            enemies.forEach((en, i) => {
+                en.y += en.speed;
+                
+                // ถ้าศัตรูหลุดขอบล่าง = แพ้
+                if (en.y > canvas.height) {
+                    gameOver();
+                }
+
+                // ตรวจสอบการยิงโดน
+                bullets.forEach((b, bi) => {
+                    if (b.x < en.x + en.w && b.x + b.w > en.x && b.y < en.y + en.h && b.y + b.h > en.y) {
+                        enemies.splice(i, 1);
+                        bullets.splice(bi, 1);
+                        score += 10;
+                        scoreElement.innerText = score;
+                    }
+                });
+            });
         }
 
         function draw() {
-            // พื้นหลัง
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // วาดตัวงู
-            for(let i = 0; i < snake.length; i++) {
-                ctx.fillStyle = (i == 0) ? "#2ecc71" : "#27ae60"; // หัวสีอ่อน ตัวสีเข้ม
-                ctx.fillRect(snake[i].x, snake[i].y, box, box);
-                ctx.strokeStyle = "black";
-                ctx.strokeRect(snake[i].x, snake[i].y, box, box);
-            }
+            // วาดตัวผู้เล่น (ยาน)
+            ctx.fillStyle = "#00f0ff";
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            ctx.fillStyle = "#fff"; // หัวยาน
+            ctx.fillRect(player.x + 15, player.y - 5, 10, 5);
 
-            // วาดอาหาร
-            ctx.fillStyle = "#e74c3c";
-            ctx.fillRect(food.x, food.y, box, box);
+            // วาดกระสุน
+            ctx.fillStyle = "#f9d423";
+            bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
 
-            // ตำแหน่งหัวงูเดิม
-            let snakeX = snake[0].x;
-            let snakeY = snake[0].y;
-
-            // เลื่อนหัวงูตามทิศทาง
-            if( d == "LEFT") snakeX -= box;
-            if( d == "UP") snakeY -= box;
-            if( d == "RIGHT") snakeX += box;
-            if( d == "DOWN") snakeY += box;
-
-            // ตรวจสอบว่ากินอาหารหรือไม่
-            if(snakeX == food.x && snakeY == food.y) {
-                score++;
-                scoreElement.innerHTML = score;
-                food = { x: Math.floor(Math.random() * 19 + 1) * box, y: Math.floor(Math.random() * 19 + 1) * box };
-            } else {
-                snake.pop(); // เอาหางออกถ้าไม่ได้กิน
-            }
-
-            let newHead = { x: snakeX, y: snakeY };
-
-            // กฎการแพ้ (ชนกำแพง หรือ ชนตัวเอง)
-            if(snakeX < 0 || snakeY < 0 || snakeX >= canvas.width || snakeY >= canvas.height || collision(newHead, snake)) {
-                clearInterval(game);
-                alert("Game Over! คะแนนของคุณคือ: " + score);
-                location.reload(); // รีโหลดหน้าใหม่เพื่อเริ่มเกม
-            }
-
-            snake.unshift(newHead); // เพิ่มหัวใหม่เข้าไป
+            // วาดศัตรู
+            ctx.fillStyle = "#ff4d4d";
+            enemies.forEach(en => {
+                ctx.fillRect(en.x, en.y, en.w, en.h);
+                // ตกแต่งเอเลี่ยนนิดนึง
+                ctx.fillStyle = "white";
+                ctx.fillRect(en.x + 5, en.y + 5, 5, 5);
+                ctx.fillRect(en.x + 20, en.y + 5, 5, 5);
+                ctx.fillStyle = "#ff4d4d";
+            });
         }
 
-        function collision(head, array) {
-            for(let i = 0; i < array.length; i++) {
-                if(head.x == array[i].x && head.y == array[i].y) return true;
-            }
-            return false;
+        function gameOver() {
+            alert("GAME OVER! คะแนนของคุณคือ: " + score);
+            score = 0;
+            scoreElement.innerText = score;
+            enemies = [];
+            bullets = [];
+            player.x = 180;
         }
 
-        let game = setInterval(draw, 100); // ตั้งค่าความเร็ว (ยิ่งน้อยยิ่งเร็ว)
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // เริ่มเกม
+        setInterval(spawnEnemy, 1000);
+        gameLoop();
     </script>
 </body>
 </html>
